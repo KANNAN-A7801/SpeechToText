@@ -1,33 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Speech to Text Dashboard</title>
-<style>
-  body{font-family:system-ui,sans-serif;max-width:900px;margin:24px auto;padding:0 16px;color:#222}
-  button{padding:8px 16px;border:0;border-radius:6px;cursor:pointer;background:#2563eb;color:#fff;margin-right:6px}
-  button.danger{background:#dc2626} button.gray{background:#6b7280}
-  #live{min-height:80px;border:1px solid #ccc;border-radius:8px;padding:12px;margin:12px 0;font-size:1.1rem;white-space:pre-wrap}
-  table{width:100%;border-collapse:collapse;margin-top:12px} th,td{border-bottom:1px solid #eee;padding:8px;text-align:left;vertical-align:top}
-  textarea{width:100%;min-height:60px}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Speech to Text Dashboard</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 900px;
+      margin: 24px auto;
+      padding: 0 16px;
+      color: #222
+    }
+
+    button {
+      padding: 8px 16px;
+      border: 0;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #2563eb;
+      color: #fff;
+      margin-right: 6px
+    }
+
+    button.danger {
+      background: #dc2626
+    }
+
+    button.gray {
+      background: #6b7280
+    }
+
+    #live {
+      min-height: 80px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 12px 0;
+      font-size: 1.1rem;
+      white-space: pre-wrap
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid #eee;
+      padding: 8px;
+      text-align: left;
+      vertical-align: top
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 60px
+    }
+  </style>
 </head>
+
 <body>
-<h1>Real-time Speech to Text</h1>
-<p>Speak in Hindi, English, or a mix. Text appears live; it is saved to MySQL when you stop.</p>
-<button id="start">Start recording</button><button id="stop" class="gray" disabled>Stop &amp; save</button>
-<span id="status"></span>
-<div id="live">Transcript will appear here…</div>
+  <h1>Real-time Speech to Text</h1>
+  <p>Speak in Hindi, English, or a mix. Text appears live.</p>
+  <button id="start">Start recording</button><button id="stop" class="gray" disabled>Stop &amp; save</button>
+  <span id="status"></span>
+  <div id="live">Transcript will appear here…</div>
 
-<h2>History</h2>
-<table><thead><tr><th>ID</th><th>Text</th><th>Created</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table>
+  <h2>History</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Text</th>
+        <th>Created</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
 
-<script>
-let ws, ctx, stream, node;
-const live = document.getElementById('live'), statusEl = document.getElementById('status');
+  <script>
+    let ws, ctx, stream, node;
+    const live = document.getElementById('live'), statusEl = document.getElementById('status');
 
-// AudioWorklet (inline): converts mic audio to 16 kHz PCM16 and posts chunks to the main thread.
-const workletCode = `
+    // AudioWorklet (inline): converts mic audio to 16 kHz PCM16 and posts chunks to the main thread.
+    const workletCode = `
 class Pcm extends AudioWorkletProcessor {
   constructor(){ super(); this.buf=[]; this.ratio=sampleRate/16000; this.pos=0; }
   process(inputs){
@@ -43,69 +104,72 @@ class Pcm extends AudioWorkletProcessor {
 }
 registerProcessor('pcm', Pcm);`;
 
-const startBtn = document.getElementById('start'), stopBtn = document.getElementById('stop');
-let saveTimer;
-function setRecording(on) { startBtn.disabled = on; stopBtn.disabled = !on; stopBtn.className = on ? 'danger' : 'gray'; }
-function finish(msg) { clearTimeout(saveTimer); statusEl.textContent = msg; setRecording(false); }
-function stopAudio() {
-  try { node && node.disconnect(); } catch {}
-  try { stream && stream.getTracks().forEach(t => t.stop()); } catch {}
-  try { ctx && ctx.close(); } catch {}
-}
-setRecording(false);
+    const startBtn = document.getElementById('start'), stopBtn = document.getElementById('stop');
+    let saveTimer;
+    function setRecording(on) { startBtn.disabled = on; stopBtn.disabled = !on; stopBtn.className = on ? 'danger' : 'gray'; }
+    function finish(msg) { clearTimeout(saveTimer); statusEl.textContent = msg; setRecording(false); }
+    function stopAudio() {
+      try { node && node.disconnect(); } catch { }
+      try { stream && stream.getTracks().forEach(t => t.stop()); } catch { }
+      try { ctx && ctx.close(); } catch { }
+    }
+    setRecording(false);
 
-startBtn.onclick = async () => {
-  try {
-    live.textContent = ''; statusEl.textContent = 'Starting…';
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:true, noiseSuppression:true } });
-    ctx = new AudioContext();
-    await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([workletCode], {type:'application/javascript'})));
-    node = new AudioWorkletNode(ctx, 'pcm');
-    ctx.createMediaStreamSource(stream).connect(node);
+    startBtn.onclick = async () => {
+      try {
+        live.textContent = ''; statusEl.textContent = 'Starting…';
+        stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+        ctx = new AudioContext();
+        await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([workletCode], { type: 'application/javascript' })));
+        node = new AudioWorkletNode(ctx, 'pcm');
+        ctx.createMediaStreamSource(stream).connect(node);
 
-    ws = new WebSocket((location.protocol==='https:'?'wss://':'ws://') + location.host + '/ws/transcribe');
-    ws.onopen = () => { node.port.onmessage = e => ws.readyState===1 && ws.send(e.data); setRecording(true); statusEl.textContent='Connecting…'; };
-    ws.onmessage = e => {
-      const m = JSON.parse(e.data);
-      if (m.type==='ready') statusEl.textContent = '● Listening';
-      if (m.type==='partial') live.textContent += m.text;
-      if (m.type==='error') { stopAudio(); finish('Error: ' + m.message); }
-      if (m.type==='saved') { stopAudio(); finish('Saved #' + m.id); load(); }
+        ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/transcribe');
+        ws.onopen = () => { node.port.onmessage = e => ws.readyState === 1 && ws.send(e.data); setRecording(true); statusEl.textContent = 'Connecting…'; };
+        ws.onmessage = e => {
+          const m = JSON.parse(e.data);
+          if (m.type === 'ready') statusEl.textContent = '● Listening';
+          if (m.type === 'partial') live.textContent += m.text;
+          if (m.type === 'error') { stopAudio(); finish('Error: ' + m.message); }
+          if (m.type === 'saved') { stopAudio(); finish('Saved #' + m.id); load(); }
+        };
+        ws.onerror = () => { stopAudio(); finish('Error: could not connect to the server'); };
+        ws.onclose = () => { stopAudio(); if (!/^(Saved|Error)/.test(statusEl.textContent)) finish('Closed'); };
+      } catch (err) { stopAudio(); finish('Error: ' + err.message); }
     };
-    ws.onerror = () => { stopAudio(); finish('Error: could not connect to the server'); };
-    ws.onclose = () => { stopAudio(); if (!/^(Saved|Error)/.test(statusEl.textContent)) finish('Closed'); };
-  } catch (err) { stopAudio(); finish('Error: ' + err.message); }
-};
 
-stopBtn.onclick = () => {
-  stopAudio();
-  statusEl.textContent = 'Saving…';
-  stopBtn.disabled = true;
-  if (ws && ws.readyState === 1) ws.send('stop');
-  // Never stay stuck: if the server does not answer in 10 s, tell the user.
-  saveTimer = setTimeout(() => finish('Error: server did not confirm the save, check the Command Prompt window'), 10000);
-};
+    stopBtn.onclick = () => {
+      stopAudio();
+      statusEl.textContent = 'Saving…';
+      stopBtn.disabled = true;
+      if (ws && ws.readyState === 1) ws.send('stop');
+      // Never stay stuck: if the server does not answer in 10 s, tell the user.
+      saveTimer = setTimeout(() => finish('Error: server did not confirm the save, check the Command Prompt window'), 10000);
+    };
 
-// ---------- CRUD dashboard ----------
-const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-async function load() {
-  const list = await (await fetch('/api/transcriptions')).json();
-  document.getElementById('rows').innerHTML = list.map(t => `
+    // ---------- CRUD dashboard ----------
+    const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    async function load() {
+      const list = await (await fetch('/api/transcriptions')).json();
+      document.getElementById('rows').innerHTML = list.map(t => `
     <tr><td>${t.id}</td><td id="t${t.id}">${esc(t.text)}</td>
-    <td>${new Date(t.createdAt+'Z').toLocaleString()}</td>
+    <td>${new Date(t.createdAt + 'Z').toLocaleString()}</td>
     <td><button onclick="edit(${t.id})">Edit</button><button class="danger" onclick="del(${t.id})">Delete</button></td></tr>`).join('');
-}
-async function edit(id) {
-  const cell = document.getElementById('t'+id), old = cell.textContent;
-  cell.innerHTML = `<textarea id="ta${id}">${esc(old)}</textarea><button onclick="save(${id})">Save</button><button class="gray" onclick="load()">Cancel</button>`;
-}
-async function save(id) {
-  await fetch('/api/transcriptions/'+id, { method:'PUT', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ text: document.getElementById('ta'+id).value }) });
-  load();
-}
-async function del(id) { if(confirm('Delete this transcription?')) { await fetch('/api/transcriptions/'+id,{method:'DELETE'}); load(); } }
-load();
-</script>
+    }
+    async function edit(id) {
+      const cell = document.getElementById('t' + id), old = cell.textContent;
+      cell.innerHTML = `<textarea id="ta${id}">${esc(old)}</textarea><button onclick="save(${id})">Save</button><button class="gray" onclick="load()">Cancel</button>`;
+    }
+    async function save(id) {
+      await fetch('/api/transcriptions/' + id, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: document.getElementById('ta' + id).value })
+      });
+      load();
+    }
+    async function del(id) { if (confirm('Delete this transcription?')) { await fetch('/api/transcriptions/' + id, { method: 'DELETE' }); load(); } }
+    load();
+  </script>
 </body>
+
 </html>

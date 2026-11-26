@@ -10,7 +10,9 @@ LoadDotEnv(
 var builder = WebApplication.CreateBuilder(args);
 // Real secrets go in .env or appsettings.Local.json (both git-ignored). They override appsettings.json.
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
-var cs = builder.Configuration.GetConnectionString("Default")!;
+var cs = builder.Configuration.GetConnectionString("Default");
+if (string.IsNullOrWhiteSpace(cs))
+    throw new InvalidOperationException("ConnectionStrings:Default is missing. Check appsettings.json and ensure the file is not marked Hidden.");
 builder.Services.AddDbContext<AppDbContext>(o => o.UseMySql(cs, ServerVersion.AutoDetect(cs)));
 builder.Services.AddSingleton<GeminiLiveBridge>();
 
